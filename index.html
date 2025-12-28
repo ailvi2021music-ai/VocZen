@@ -176,7 +176,9 @@
         <!-- Иконки вместо текста -->
         <button class="smallbtn iconbtn" id="newBtn" type="button" aria-label="Новые (взять из резерва)">＋</button>
         <button class="smallbtn iconbtn" id="skipBtn" type="button" aria-label="Пропустить">➜</button>
-        <button class="smallbtn" id="repeatBtn" type="button">Повторить</button>
+
+        <!-- ✅ Повторить = ⟳ (не похоже на ↩) -->
+        <button class="smallbtn iconbtn" id="repeatBtn" type="button" aria-label="Повторить">⟳</button>
       </div>
 
       <details open>
@@ -597,16 +599,17 @@
     renderTraining(false);
   }
 
-  // ✅ НОВАЯ ЛОГИКА "ПОВТОРИТЬ":
+  // ✅ "Повторить" = ⟳
+  // Логика:
   // - работает с 1+
-  // - берёт N из "Выучено" (N = min(learned, 10))
-  // - переносит их в "Изучаемые"
-  // - вымещает N текущих "Изучаемых" в "Резерв"
-  // - удаляет эти N из "Выучено"
+  // - берёт N из "Выучено" (N = min(learned, 10), но без тех, что уже в active)
+  // - удаляет их из "Выучено"
+  // - вымещает N элементов из active в резерв
+  // - добавляет picked в active
   function takeRepeatFromLearned(){
     const st = S[appMode];
 
-    // сброс undo-истории (как у тебя было)
+    // сброс undo-истории
     undoStacks[appMode] = [];
 
     if (!st.learned || st.learned.length === 0){
@@ -615,20 +618,17 @@
       return;
     }
 
-    // сколько хотим вернуть на повтор
     const wantN = Math.min(st.learned.length, BATCH_SIZE);
 
-    // исключим случай, когда часть "выучено" уже присутствует в active
     const activeKeys = new Set((st.active || []).map(x => pairKey(x)));
     const picked = [];
     const pickedKeys = new Set();
 
-    // случайно выбираем из выученного
     const shuffled = shuffle(st.learned.slice());
     for (const item of shuffled) {
       const k = pairKey(item);
       if (!k || pickedKeys.has(k)) continue;
-      if (activeKeys.has(k)) continue; // уже изучается — не берём
+      if (activeKeys.has(k)) continue;
       picked.push(item);
       pickedKeys.add(k);
       if (picked.length >= wantN) break;
@@ -642,19 +642,14 @@
 
     const n = picked.length;
 
-    // 1) удаляем picked из "Выучено"
+    // 1) удалить picked из learned
     st.learned = st.learned.filter(x => !pickedKeys.has(pairKey(x)));
 
-    // 2) вымещаем n текущих "Изучаемых" в "Резерв"
-    //    (вымещаем с конца, чтобы меньше шанс снести "текущее" слово)
+    // 2) выместить n из active в vault (с конца)
     let kicked = [];
     if (Array.isArray(st.active) && st.active.length > 0){
-      if (st.active.length >= n) {
-        kicked = st.active.splice(st.active.length - n, n);
-      } else {
-        // если активных меньше — вымещаем всё что есть
-        kicked = st.active.splice(0, st.active.length);
-      }
+      if (st.active.length >= n) kicked = st.active.splice(st.active.length - n, n);
+      else kicked = st.active.splice(0, st.active.length);
     } else {
       st.active = [];
     }
@@ -665,15 +660,13 @@
       st.vault = dedupePairs(st.vault).out;
     }
 
-    // 3) добавляем picked в "Изучаемые"
+    // 3) добавить picked в active
     st.active.push(...picked);
     st.active = dedupePairs(st.active).out;
 
-    // 4) если после операций активных стало <4 — тренировка невозможна (4 варианта ответа)
-    //    но данные мы НЕ теряем, просто показываем сообщение
     saveModeData(appMode);
 
-    // поправим pos/current так, чтобы не улетело
+    // поправить текущую позицию
     if (!st.active || st.active.length === 0){
       pos = 0;
       current = null;
@@ -685,7 +678,7 @@
     if (pos >= st.active.length) pos = 0;
     current = st.active[pos];
 
-    setMsg(`Повтор: добавлено ${n} → изучаемые. В резерв: ${kicked.length}.`, 'ok');
+    setMsg(`⟳ Повтор: +${n} / в резерв: ${kicked.length}`, 'ok');
     renderTraining(false);
   }
 
@@ -697,12 +690,10 @@
   }
 
   // ✓ Знаю: перенос текущего в выучено + замена из резерва (если есть)
-  // Снапшот в стек — можно откатывать сколько угодно раз
   function knowAndReplace(){
     const st = S[appMode];
     if (!current || !st.active || st.active.length < 4) return;
 
-    // push snapshot
     undoStacks[appMode].push({
       state: deepClone({ active: st.active, vault: st.vault, learned: st.learned }),
       pos,
@@ -712,23 +703,18 @@
 
     const curKey = pairKey(current);
 
-    // 1) current -> learned
     st.learned.push({ a: current.a, b: current.b });
     st.learned = dedupePairs(st.learned).out;
 
-    // 2) найти индекс текущего в active (на всякий случай)
     const idx = st.active.findIndex(x => pairKey(x) === curKey);
     const useIdx = idx >= 0 ? idx : pos;
 
-    // 3) заменить элемент на новый из резерва (или удалить, если резерва нет)
     if (st.vault && st.vault.length > 0) {
       const pick = Math.floor(Math.random() * st.vault.length);
       const replacement = st.vault.splice(pick, 1)[0];
-      st.active[useIdx] = replacement; // сохраняем размер active и позицию
+      st.active[useIdx] = replacement;
     } else {
-      // если резерв пуст — удаляем этот элемент из активных
       st.active.splice(useIdx, 1);
-      // поправить pos
       if (st.active.length > 0) pos = useIdx % st.active.length;
       else pos = 0;
     }
