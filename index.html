@@ -65,6 +65,15 @@
       touch-action: manipulation;
     }
     .smallbtn:active{ transform:scale(0.99); }
+    .smallbtn:disabled{ opacity:0.45; cursor:not-allowed; }
+
+    .iconbtn{
+      width:44px;
+      text-align:center;
+      font-size:18px;
+      line-height:1;
+      padding:10px 0;
+    }
 
     .modeToggle{
       width:44px; height:38px;
@@ -79,12 +88,7 @@
       touch-action: manipulation;
       position:relative;
     }
-    .modeDots{
-      display:flex;
-      gap:10px;
-      align-items:center;
-      justify-content:center;
-    }
+    .modeDots{ display:flex; gap:10px; align-items:center; justify-content:center; }
     .dot{
       width:8px; height:8px;
       border-radius:999px;
@@ -97,18 +101,17 @@
     }
     .modeToggle:active{ transform:scale(0.99); }
 
-    .danger{ border-color: rgba(255,0,0,0.35); }
-
+    /* Сообщение без зарезервированного места */
     .msg{
       margin-top:10px;
       padding:10px 12px;
       border-radius:12px;
       background:rgba(255,255,255,0.06);
       border:1px solid rgba(255,255,255,0.10);
-      min-height:24px;
       font-size:14px;
       white-space:pre-wrap;
       word-break: break-word;
+      display:none; /* важно */
     }
     .msg.ok{ border-color: rgba(0,255,0,0.30); }
     .msg.bad{ border-color: rgba(255,0,0,0.30); }
@@ -148,7 +151,7 @@
     <div class="card">
 
       <div class="word" id="questionText">—</div>
-      <div class="hint" id="hintText">Нажми «Новые» или добавь данные в резерв</div>
+      <div class="hint" id="hintText">Нажми ＋ или добавь данные в резерв</div>
 
       <div class="grid" id="answers"></div>
 
@@ -163,15 +166,25 @@
         </button>
 
         <button class="smallbtn" id="dirBtn" type="button">EN→RU</button>
-        <button class="smallbtn" id="newBtn" type="button">Новые</button>
-        <button class="smallbtn" id="skipBtn" type="button">Пропустить</button>
+
+        <!-- ✓ = знаю/замени -->
+        <button class="smallbtn iconbtn" id="knowBtn" type="button" aria-label="Знаю (перенести в выучено и заменить)">✓</button>
+
+        <!-- ↩ = многошаговый undo -->
+        <button class="smallbtn iconbtn" id="undoBtn" type="button" aria-label="Шаг назад (отменить)">↩</button>
+
+        <!-- Иконки вместо текста -->
+        <button class="smallbtn iconbtn" id="newBtn" type="button" aria-label="Новые (взять из резерва)">＋</button>
+        <button class="smallbtn iconbtn" id="skipBtn" type="button" aria-label="Пропустить">➜</button>
         <button class="smallbtn" id="repeatBtn" type="button">Повторить</button>
       </div>
 
       <details open>
         <summary><span id="vaultTitle">Резерв</span> <span id="vaultCount">(0)</span></summary>
 
-        <div class="muted" id="vaultHelp">Формат: EN - RU</div>
+        <div class="muted" id="vaultHelp">
+          Формат: english - русский, по одному на строку. Минимум 4 строки.
+        </div>
 
         <div class="taWrap">
           <textarea id="vaultTextarea" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
@@ -190,7 +203,8 @@
         </div>
 
         <div class="row">
-          <button class="smallbtn danger" id="clearLearnedBtn" type="button">Очистить</button>
+          <!-- корзина вместо "Очистить" -->
+          <button class="smallbtn iconbtn" id="clearLearnedBtn" type="button" aria-label="Очистить выучено">🗑</button>
         </div>
       </details>
 
@@ -225,14 +239,19 @@
   const dotRight = document.getElementById('dotRight');
 
   const btnDir    = document.getElementById('dirBtn');
+  const btnKnow   = document.getElementById('knowBtn');
+  const btnUndo   = document.getElementById('undoBtn');
   const btnNew    = document.getElementById('newBtn');
   const btnSkip   = document.getElementById('skipBtn');
   const btnRepeat = document.getElementById('repeatBtn');
 
+  const elVaultTitle = document.getElementById('vaultTitle');
+  const elVaultHelp  = document.getElementById('vaultHelp');
   const elVaultCount = document.getElementById('vaultCount');
   const taVault      = document.getElementById('vaultTextarea');
   const btnSaveVault = document.getElementById('saveVaultBtn');
 
+  const elLearnedTitle = document.getElementById('learnedTitle');
   const elLearnedCount = document.getElementById('learnedCount');
   const taLearned      = document.getElementById('learnedTextarea');
   const btnClearLearned= document.getElementById('clearLearnedBtn');
@@ -246,6 +265,9 @@
   const saveStr  = (k, v) => localStorage.setItem(k, v);
 
   const norm = (s) => (String(s ?? '').replace(/\s+/g,' ').trim().toLowerCase());
+  const pairKey = (p) => norm(p?.a) + '||' + norm(p?.b);
+
+  function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
 
   function dedupePairs(pairs) {
     const seen = new Set();
@@ -263,28 +285,30 @@
     return { out, removed };
   }
 
-  // Делим строку ТОЛЬКО при сохранении из textarea:
-  // берём ПЕРВЫЙ разделитель вида: пробел + (-/–/—) + пробел.
-  // Вся правая часть сохраняется целиком (включая любые тире внутри перевода).
-  function splitLineForSave(line) {
-    const s = String(line ?? '').trim();
-    const m = /\s[-–—]\s/.exec(s);
-    if (!m) return [s, ''];
-    const i = m.index;
-    const sepLen = m[0].length;
-    return [s.slice(0, i).trim(), s.slice(i + sepLen).trim()];
+  function splitLine(line) {
+    const s = line.trim();
+    const seps = [' - ', ' — ', ' – '];
+    for (const sep of seps) {
+      const i = s.indexOf(sep);
+      if (i > -1) return [s.slice(0,i).trim(), s.slice(i+sep.length).trim()];
+    }
+    for (const ch of ['—','–','-']) {
+      const i = s.indexOf(ch);
+      if (i > -1) return [s.slice(0,i).trim(), s.slice(i+1).trim()];
+    }
+    return [s,''];
   }
 
   function parseTextarea(text) {
     const lines = String(text ?? '').split('\n').map(x => x.trim()).filter(Boolean);
     const pairs = [];
-    let badCount = 0;
+    const bad = [];
     for (const ln of lines) {
-      const [a,b] = splitLineForSave(ln);
-      if (!a || !b) { badCount++; continue; }
+      const [a,b] = splitLine(ln);
+      if (!a || !b) { bad.push(ln); continue; }
       pairs.push({ a, b });
     }
-    return { pairs, badCount };
+    return { pairs, badCount: bad.length };
   }
 
   function shuffle(arr) {
@@ -308,18 +332,39 @@
     return out;
   }
 
-  let appMode = loadStr(LS_APP_MODE, 'words');
-  let dirMode = loadStr(LS_DIR, 'EN_RU');
+  let appMode = loadStr(LS_APP_MODE, 'words'); // words | sent
+  let dirMode = loadStr(LS_DIR, 'EN_RU');      // EN_RU | RU_EN
 
   const S = {
     words: { active: [], vault: [], learned: [] },
     sent:  { active: [], vault: [], learned: [] }
   };
 
-  let deck = [];
+  // Последовательный цикл (без shuffle раундов)
   let pos = 0;
   let current = null;
   let lock = false;
+
+  // Многошаговый undo: отдельный стек для каждого режима
+  const undoStacks = { words: [], sent: [] };
+
+  function updateUndoBtn(){
+    const stack = undoStacks[appMode];
+    btnUndo.disabled = !(stack && stack.length > 0);
+  }
+
+  function setMsg(text, kind=''){
+    if (!text) {
+      elMsg.textContent = '';
+      elMsg.classList.remove('ok','bad');
+      elMsg.style.display = 'none';
+      return;
+    }
+    elMsg.textContent = text;
+    elMsg.classList.remove('ok','bad');
+    if (kind) elMsg.classList.add(kind);
+    elMsg.style.display = 'block';
+  }
 
   function migrateOnce() {
     if (loadStr(LS_MIGRATED,'0') === '1') return;
@@ -377,33 +422,40 @@
   }
 
   function modeLabel(){ return appMode === 'words' ? 'Слова' : 'Предложения'; }
-
-  function setMsg(text, kind=''){
-    elMsg.textContent = text || '';
-    elMsg.classList.remove('ok','bad');
-    if (kind) elMsg.classList.add(kind);
+  function reserveHelpText(){
+    return appMode === 'words'
+      ? 'Формат: english - русский, по одному на строку. Минимум 4 строки.'
+      : 'Формат: English sentence - Русский смысл, по одному на строку. Минимум 4 строки.';
   }
 
   function syncTextareas(){
     const st = S[appMode];
     taVault.value = st.vault.map(x => `${x.a} - ${x.b}`).join('\n');
     taLearned.value = st.learned.map(x => `${x.a} - ${x.b}`).join('\n');
+
     elVaultCount.textContent = `(${st.vault.length})`;
     elLearnedCount.textContent = `(${st.learned.length})`;
-    btnNew.textContent = 'Новые';
+    elVaultTitle.textContent = 'Резерв';
+    elLearnedTitle.textContent = 'Выучено';
+    elVaultHelp.textContent = reserveHelpText();
+
     btnDir.textContent = (dirMode === 'EN_RU') ? 'EN→RU' : 'RU→EN';
+
     dotLeft.classList.toggle('on', appMode === 'words');
     dotRight.classList.toggle('on', appMode === 'sent');
+
+    updateUndoBtn();
   }
 
   function buildQuestion(){
+    const st = S[appMode];
     if (!current) return null;
 
     const question = (dirMode === 'EN_RU') ? current.a : current.b;
     const correct  = (dirMode === 'EN_RU') ? current.b : current.a;
 
-    const pool = S[appMode].active
-      .filter(x => x !== current)
+    const pool = st.active
+      .filter(x => pairKey(x) !== pairKey(current))
       .map(x => (dirMode === 'EN_RU') ? x.b : x.a);
 
     const wrongs = pickWrongOptions(pool, correct, 3);
@@ -412,7 +464,7 @@
     return { question, correct, options };
   }
 
-  function renderTraining(forceClear=false){
+  function renderTraining(clearMsg=false){
     syncTextareas();
     const st = S[appMode];
 
@@ -420,13 +472,14 @@
       elQuestion.textContent = '—';
       elHint.textContent = `Недостаточно элементов для тренировки (${modeLabel()}).`;
       elAnswers.innerHTML = '';
-      if (forceClear) setMsg('');
+      if (clearMsg) setMsg('');
       return;
     }
 
     if (!current){
-      startRound();
-      return;
+      pos = 0;
+      current = st.active[pos];
+      if (clearMsg) setMsg('');
     }
 
     const q = buildQuestion();
@@ -448,8 +501,6 @@
       b.addEventListener('click', () => onAnswer(opt, q.correct));
       elAnswers.appendChild(b);
     });
-
-    if (forceClear) setMsg('');
   }
 
   function disableAnswers(disabled){
@@ -468,103 +519,119 @@
     }
   }
 
-  function startRound(){
-    const st = S[appMode];
-    deck = shuffle([...Array(st.active.length).keys()]);
-    pos = 0;
-    current = st.active[deck[pos]];
-    renderTraining(true);
-  }
-
+  // Последовательный цикл: pos = (pos+1) mod N
   function goNext(){
     const st = S[appMode];
     disableAnswers(false);
     lock = false;
 
-    pos += 1;
-    if (pos >= deck.length){
-      deck = shuffle([...Array(st.active.length).keys()]);
-      pos = 0;
+    if (!st.active || st.active.length < 4){
+      current = null;
+      renderTraining(true);
+      return;
     }
-    current = st.active[deck[pos]];
-    renderTraining(true);
+
+    pos = (pos + 1) % st.active.length;
+    current = st.active[pos];
+    renderTraining(false);
   }
 
   function saveVaultFromTextarea(){
     const { pairs, badCount } = parseTextarea(taVault.value);
     const { out, removed } = dedupePairs(pairs);
-
-    if (out.length < 4){
-      setMsg(`Нужно минимум 4 валидные строки в резерв (${modeLabel()}).`,'bad');
-      return;
-    }
-
     S[appMode].vault = out;
     saveModeData(appMode);
     syncTextareas();
 
     let msg = 'Сохранено ✅';
     const parts = [];
-    if (removed>0) parts.push(`дублей: ${removed}`);
-    if (badCount>0) parts.push(`пропущено: ${badCount}`);
+    if (removed>0) parts.push(`дублей удалено: ${removed}`);
+    if (badCount>0) parts.push(`строк пропущено: ${badCount}`);
     if (parts.length) msg += ` (${parts.join(', ')})`;
     setMsg(msg,'ok');
   }
 
+  // Перенос active -> learned (с дедупом)
   function moveActiveToLearned(){
     const st = S[appMode];
     const merged = [...st.learned, ...st.active];
     st.learned = dedupePairs(merged).out;
-    saveModeData(appMode);
   }
 
+  // ＋ Новые: безопасно — если из резерва < 4, ничего не переносим и не трогаем
   function takeNewBatchFromVault(){
     const st = S[appMode];
-    if (st.active.length) moveActiveToLearned();
 
+    // сброс undo-истории при смене набора
+    undoStacks[appMode] = [];
+
+    if (!st.vault || st.vault.length < 4){
+      setMsg(`В резерве меньше 4 строк (${modeLabel()}). Добавь минимум 4.`, 'bad');
+      syncTextareas();
+      return;
+    }
+
+    // подготовим батч, НЕ трогая данные, пока не уверены
     const shuffledVault = shuffle(st.vault.slice());
     const take = shuffledVault.slice(0, BATCH_SIZE);
+    if (take.length < 4){
+      setMsg(`Недостаточно для набора (нужно 4+).`, 'bad');
+      syncTextareas();
+      return;
+    }
 
-    const takeSet = new Set(take.map(x => norm(x.a)+'||'+norm(x.b)));
-    const rest = st.vault.filter(x => !takeSet.has(norm(x.a)+'||'+norm(x.b)));
+    // теперь можно коммитить изменения состояния
+    if (st.active.length) moveActiveToLearned();
+
+    const takeSet = new Set(take.map(x => pairKey(x)));
+    const rest = st.vault.filter(x => !takeSet.has(pairKey(x)));
 
     st.active = take;
     st.vault = rest;
+
     saveModeData(appMode);
 
-    if (st.active.length < 4){
-      current = null;
-      setMsg(`Недостаточно элементов. Добавь минимум 4 строки в резерв (${modeLabel()}).`,'bad');
-      renderTraining(false);
-      return;
-    }
-
+    pos = 0;
+    current = st.active[pos];
     setMsg(`${modeLabel()}: загружено ${st.active.length} ✅`,'ok');
-    startRound();
+    renderTraining(false);
   }
 
+  // Повторить: безопасно — если learned < 4, ничего не переносим/не удаляем
   function takeRepeatFromLearned(){
     const st = S[appMode];
 
-    const shuffled = shuffle(st.learned.slice());
-    const take = shuffled.slice(0, BATCH_SIZE);
+    // сброс undo-истории
+    undoStacks[appMode] = [];
 
-    const takeSet = new Set(take.map(x => norm(x.a)+'||'+norm(x.b)));
-    const rest = st.learned.filter(x => !takeSet.has(norm(x.a)+'||'+norm(x.b)));
-
-    st.active = take;
-    st.learned = rest;
-    saveModeData(appMode);
-
-    if (st.active.length < 4){
-      current = null;
-      setMsg(`Недостаточно выученного для повтора (${modeLabel()}).`,'bad');
-      renderTraining(false);
+    if (!st.learned || st.learned.length < 4){
+      setMsg(`Недостаточно выученного для повтора (${modeLabel()}). Нужно минимум 4.`, 'bad');
+      syncTextareas();
       return;
     }
 
+    // готовим батч на копии
+    const shuffled = shuffle(st.learned.slice());
+    const take = shuffled.slice(0, BATCH_SIZE);
+    if (take.length < 4){
+      setMsg(`Недостаточно выученного для повтора (${modeLabel()}).`, 'bad');
+      syncTextareas();
+      return;
+    }
+
+    // коммит: active = take, learned = learned - take
+    const takeSet = new Set(take.map(x => pairKey(x)));
+    const rest = st.learned.filter(x => !takeSet.has(pairKey(x)));
+
+    st.active = take;
+    st.learned = rest;
+
+    saveModeData(appMode);
+
+    pos = 0;
+    current = st.active[pos];
     setMsg(`Повтор: загружено ${st.active.length} ✅`,'ok');
-    startRound();
+    renderTraining(false);
   }
 
   function clearLearned(){
@@ -574,9 +641,88 @@
     setMsg('Выучено очищено ✅','ok');
   }
 
+  // ✓ Знаю: перенос текущего в выучено + замена из резерва (если есть)
+  // Снапшот в стек — можно откатывать сколько угодно раз
+  function knowAndReplace(){
+    const st = S[appMode];
+    if (!current || !st.active || st.active.length < 4) return;
+
+    // push snapshot
+    undoStacks[appMode].push({
+      state: deepClone({ active: st.active, vault: st.vault, learned: st.learned }),
+      pos,
+      currentKey: pairKey(current)
+    });
+    updateUndoBtn();
+
+    const curKey = pairKey(current);
+
+    // 1) current -> learned
+    st.learned.push({ a: current.a, b: current.b });
+    st.learned = dedupePairs(st.learned).out;
+
+    // 2) найти индекс текущего в active (на всякий случай)
+    const idx = st.active.findIndex(x => pairKey(x) === curKey);
+    const useIdx = idx >= 0 ? idx : pos;
+
+    // 3) заменить элемент на новый из резерва (или удалить, если резерва нет)
+    let replacement = null;
+    if (st.vault && st.vault.length > 0) {
+      const pick = Math.floor(Math.random() * st.vault.length);
+      replacement = st.vault.splice(pick, 1)[0];
+      st.active[useIdx] = replacement; // сохраняем размер active и позицию
+    } else {
+      // если резерв пуст — удаляем этот элемент из активных
+      st.active.splice(useIdx, 1);
+      // поправить pos
+      if (st.active.length > 0) pos = useIdx % st.active.length;
+      else pos = 0;
+    }
+
+    saveModeData(appMode);
+
+    if (!st.active || st.active.length < 4){
+      current = null;
+      setMsg(`Недостаточно элементов для тренировки (${modeLabel()}). Добавь минимум 4 строки в резерв.`, 'bad');
+      renderTraining(false);
+      return;
+    }
+
+    // показать замену сразу (или следующий элемент, если удалили)
+    current = st.active[pos];
+    setMsg('Готово ✅','ok');
+    renderTraining(false);
+  }
+
+  // ↩ многошаговый undo
+  function undoKnow(){
+    const stack = undoStacks[appMode];
+    if (!stack || stack.length === 0){
+      updateUndoBtn();
+      return;
+    }
+
+    const snap = stack.pop();
+    const st = S[appMode];
+
+    st.active  = deepClone(snap.state.active);
+    st.vault   = deepClone(snap.state.vault);
+    st.learned = deepClone(snap.state.learned);
+
+    saveModeData(appMode);
+
+    pos = Math.min(Math.max(0, snap.pos ?? 0), Math.max(0, st.active.length - 1));
+    current = st.active[pos] || null;
+
+    setMsg('Отменено ↩','ok');
+    updateUndoBtn();
+    renderTraining(false);
+  }
+
   btnModeToggle.addEventListener('click', () => {
     appMode = (appMode === 'words') ? 'sent' : 'words';
     saveStr(LS_APP_MODE, appMode);
+    pos = 0;
     current = null;
     setMsg('');
     renderTraining(true);
@@ -586,7 +732,7 @@
     dirMode = (dirMode === 'EN_RU') ? 'RU_EN' : 'EN_RU';
     saveStr(LS_DIR, dirMode);
     setMsg('');
-    renderTraining(true);
+    renderTraining(false);
   });
 
   btnSaveVault.addEventListener('click', saveVaultFromTextarea);
@@ -594,17 +740,22 @@
   btnRepeat.addEventListener('click', takeRepeatFromLearned);
 
   btnSkip.addEventListener('click', () => {
-    setMsg('Пропущено ➜ далее','');
-    setTimeout(goNext, 120);
+    setMsg('');
+    goNext();
   });
 
   btnClearLearned.addEventListener('click', clearLearned);
 
+  btnKnow.addEventListener('click', knowAndReplace);
+  btnUndo.addEventListener('click', undoKnow);
+
+  // init
   migrateOnce();
   loadModeData('words');
   loadModeData('sent');
 
   syncTextareas();
+  updateUndoBtn();
   renderTraining(true);
 })();
 </script>
