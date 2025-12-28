@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>VocZen</title>
   <meta name="apple-mobile-web-app-title" content="VocZen">
-  <meta name="theme-color" content="#111111" />
+  <meta name="theme-color" content="#0a1220" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.webmanifest">
@@ -13,59 +13,138 @@
   <style>
     :root { color-scheme: light dark; }
     * { box-sizing: border-box; }
+
     body{
       margin:0;
       font-family:-apple-system, system-ui, Segoe UI, Roboto, Arial, sans-serif;
-      background:#0b0b0c; color:#fff;
+      color:#eaf6ff;
       -webkit-text-size-adjust:100%;
+      background:
+        radial-gradient(1200px 800px at 20% 10%, rgba(60,170,255,0.18), transparent 55%),
+        radial-gradient(900px 600px at 85% 30%, rgba(70,255,240,0.12), transparent 60%),
+        radial-gradient(1100px 900px at 50% 110%, rgba(20,90,255,0.10), transparent 60%),
+        linear-gradient(180deg, #05070f 0%, #040612 55%, #02030a 100%);
     }
-    .page{ min-height:100svh; display:flex; align-items:center; justify-content:center; padding:16px; }
-    .wrap{ width:100%; max-width:560px; }
-    .card{
-      background:rgba(255,255,255,0.06);
-      border:1px solid rgba(255,255,255,0.10);
-      border-radius:16px;
+
+    .page{
+      min-height:100svh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
       padding:16px;
-      backdrop-filter: blur(10px);
     }
+
+    .wrap{
+      width:100%;
+      max-width:560px;
+      position:relative;
+    }
+    .wrap:before{
+      content:"";
+      position:absolute;
+      inset:-30px;
+      background:
+        radial-gradient(420px 240px at 18% 18%, rgba(60,170,255,0.18), transparent 70%),
+        radial-gradient(420px 260px at 82% 16%, rgba(70,255,240,0.12), transparent 70%),
+        radial-gradient(520px 360px at 50% 88%, rgba(60,170,255,0.10), transparent 70%);
+      filter: blur(10px);
+      opacity:0.95;
+      pointer-events:none;
+      z-index:0;
+    }
+
+    .card{
+      position:relative;
+      z-index:1;
+      background: linear-gradient(180deg, rgba(255,255,255,0.09), rgba(255,255,255,0.04));
+      border:1px solid rgba(120,200,255,0.18);
+      border-radius:22px;
+      padding:18px;
+      backdrop-filter: blur(14px);
+      box-shadow:
+        0 20px 60px rgba(0,0,0,0.55),
+        0 0 0 1px rgba(255,255,255,0.06) inset,
+        0 0 70px rgba(60,170,255,0.10);
+    }
+    .card:before{
+      content:"";
+      position:absolute;
+      inset:-2px;
+      border-radius:24px;
+      padding:2px;
+      background: linear-gradient(135deg, rgba(60,170,255,0.35), rgba(0,0,0,0), rgba(70,255,240,0.25));
+      -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events:none;
+      opacity:0.55;
+    }
+
     .word{
-      font-size:30px; font-weight:700;
+      font-size:30px;
+      font-weight:750;
       margin:10px 0 6px;
-      word-break: break-word; line-height:1.15;
+      word-break: break-word;
+      line-height:1.12;
+      letter-spacing:0.2px;
+      text-shadow: 0 10px 28px rgba(0,0,0,0.55);
     }
-    .hint{ opacity:0.7; font-size:13px; }
-    .grid{ display:grid; gap:10px; margin-top:12px; }
+    .hint{
+      opacity:0.75;
+      font-size:13px;
+      text-shadow: 0 6px 18px rgba(0,0,0,0.35);
+    }
+
+    .grid{
+      display:grid;
+      gap:10px;
+      margin-top:12px;
+    }
+
     .btn{
-      appearance:none; width:100%;
-      padding:12px 14px;
-      border-radius:14px;
-      border:1px solid rgba(255,255,255,0.14);
-      background:rgba(255,255,255,0.08);
-      color:#fff; font-size:16px;
-      text-align:left; cursor:pointer;
-      user-select:none; word-break: break-word;
+      appearance:none;
+      width:100%;
+      padding:13px 14px;
+      border-radius:16px;
+      border:1px solid rgba(120,200,255,0.18);
+      background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.05));
+      color:#eaf6ff;
+      font-size:16px;
+      text-align:left;
+      cursor:pointer;
+      user-select:none;
+      word-break: break-word;
       touch-action: manipulation;
+      box-shadow: 0 10px 24px rgba(0,0,0,0.25);
     }
     .btn:active{ transform:scale(0.99); }
-    .btn:disabled{ opacity:0.6; cursor:not-allowed; }
+    .btn:disabled{ opacity:0.55; cursor:not-allowed; }
 
     .row{
-      display:flex; gap:10px; flex-wrap:wrap;
-      margin-top:12px; align-items:center;
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top:12px;
+      align-items:center;
     }
+
     .smallbtn{
       appearance:none;
       padding:10px 12px;
-      border-radius:12px;
-      border:1px solid rgba(255,255,255,0.14);
-      background:rgba(255,255,255,0.08);
-      color:#fff; font-size:14px;
+      border-radius:14px;
+      border:1px solid rgba(120,200,255,0.18);
+      background: linear-gradient(180deg, rgba(255,255,255,0.11), rgba(255,255,255,0.05));
+      color:#eaf6ff;
+      font-size:14px;
       cursor:pointer;
       white-space:nowrap;
       touch-action: manipulation;
+      box-shadow: 0 10px 22px rgba(0,0,0,0.22);
     }
     .smallbtn:active{ transform:scale(0.99); }
-    .smallbtn:disabled{ opacity:0.45; cursor:not-allowed; }
+    .smallbtn:disabled{ opacity:0.38; cursor:not-allowed; }
 
     .iconbtn{
       width:44px;
@@ -76,10 +155,11 @@
     }
 
     .modeToggle{
-      width:44px; height:38px;
-      border-radius:12px;
-      border:1px solid rgba(255,255,255,0.14);
-      background:rgba(255,255,255,0.06);
+      width:44px;
+      height:40px;
+      border-radius:14px;
+      border:1px solid rgba(120,200,255,0.18);
+      background: linear-gradient(180deg, rgba(255,255,255,0.09), rgba(255,255,255,0.04));
       display:flex;
       align-items:center;
       justify-content:center;
@@ -87,44 +167,54 @@
       cursor:pointer;
       touch-action: manipulation;
       position:relative;
+      box-shadow: 0 12px 26px rgba(0,0,0,0.22);
     }
+    .modeToggle:active{ transform:scale(0.99); }
+
     .modeDots{ display:flex; gap:10px; align-items:center; justify-content:center; }
     .dot{
       width:8px; height:8px;
       border-radius:999px;
-      background:rgba(255,255,255,0.25);
-      border:1px solid rgba(255,255,255,0.10);
+      background:rgba(180,230,255,0.20);
+      border:1px solid rgba(120,200,255,0.18);
     }
     .dot.on{
-      background:rgba(255,255,255,0.85);
-      border-color:rgba(255,255,255,0.25);
+      background:rgba(120,220,255,0.95);
+      border-color:rgba(120,220,255,0.45);
+      box-shadow: 0 0 18px rgba(80,200,255,0.45);
     }
-    .modeToggle:active{ transform:scale(0.99); }
 
     /* Сообщение без зарезервированного места */
     .msg{
       margin-top:10px;
       padding:10px 12px;
-      border-radius:12px;
-      background:rgba(255,255,255,0.06);
-      border:1px solid rgba(255,255,255,0.10);
+      border-radius:14px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04));
+      border:1px solid rgba(120,200,255,0.18);
       font-size:14px;
       white-space:pre-wrap;
       word-break: break-word;
       display:none; /* важно */
+      box-shadow: 0 12px 28px rgba(0,0,0,0.25);
     }
-    .msg.ok{ border-color: rgba(0,255,0,0.30); }
-    .msg.bad{ border-color: rgba(255,0,0,0.30); }
+    .msg.ok{ border-color: rgba(70,255,180,0.35); }
+    .msg.bad{ border-color: rgba(255,80,80,0.40); }
 
     details{ margin-top:16px; }
-    summary{ cursor:pointer; opacity:0.85; touch-action: manipulation; }
+    summary{
+      cursor:pointer;
+      opacity:0.92;
+      touch-action: manipulation;
+      user-select:none;
+    }
 
     .taWrap{
       margin-top:10px;
-      border-radius:12px;
-      border:1px solid rgba(255,255,255,0.14);
-      background:rgba(0,0,0,0.25);
+      border-radius:14px;
+      border:1px solid rgba(120,200,255,0.18);
+      background: linear-gradient(180deg, rgba(0,0,0,0.24), rgba(0,0,0,0.12));
       overflow:hidden;
+      box-shadow: 0 16px 34px rgba(0,0,0,0.28);
     }
     textarea{
       width:100%;
@@ -133,7 +223,7 @@
       resize:vertical;
       border:none;
       background:transparent;
-      color:#fff;
+      color:#eaf6ff;
       padding:12px;
       font-size:16px;
       outline:none;
@@ -141,7 +231,12 @@
       display:block;
     }
     textarea[readonly]{ opacity:0.85; }
-    .muted{ opacity:0.65; font-size:12px; margin-top:8px; }
+
+    .muted{
+      opacity:0.72;
+      font-size:12px;
+      margin-top:8px;
+    }
   </style>
 </head>
 
@@ -177,8 +272,8 @@
         <button class="smallbtn iconbtn" id="newBtn" type="button" aria-label="Новые (взять из резерва)">＋</button>
         <button class="smallbtn iconbtn" id="skipBtn" type="button" aria-label="Пропустить">➜</button>
 
-        <!-- ✅ Повторить = ⟳ (не похоже на ↩) -->
-        <button class="smallbtn iconbtn" id="repeatBtn" type="button" aria-label="Повторить">⟳</button>
+        <!-- Повторить = ⟲ (не похоже на ↩) -->
+        <button class="smallbtn iconbtn" id="repeatBtn" type="button" aria-label="Повторить">⟲</button>
       </div>
 
       <details open>
@@ -599,86 +694,40 @@
     renderTraining(false);
   }
 
-  // ✅ "Повторить" = ⟳
-  // Логика:
-  // - работает с 1+
-  // - берёт N из "Выучено" (N = min(learned, 10), но без тех, что уже в active)
-  // - удаляет их из "Выучено"
-  // - вымещает N элементов из active в резерв
-  // - добавляет picked в active
+  // Повторить (⟲): безопасно — если learned < 4, ничего не переносим/не удаляем
   function takeRepeatFromLearned(){
     const st = S[appMode];
 
     // сброс undo-истории
     undoStacks[appMode] = [];
 
-    if (!st.learned || st.learned.length === 0){
-      setMsg(`Нет выученного для повтора (${modeLabel()}).`, 'bad');
+    if (!st.learned || st.learned.length < 4){
+      setMsg(`Недостаточно выученного для повтора (${modeLabel()}). Нужно минимум 4.`, 'bad');
       syncTextareas();
       return;
     }
 
-    const wantN = Math.min(st.learned.length, BATCH_SIZE);
-
-    const activeKeys = new Set((st.active || []).map(x => pairKey(x)));
-    const picked = [];
-    const pickedKeys = new Set();
-
+    // готовим батч на копии
     const shuffled = shuffle(st.learned.slice());
-    for (const item of shuffled) {
-      const k = pairKey(item);
-      if (!k || pickedKeys.has(k)) continue;
-      if (activeKeys.has(k)) continue;
-      picked.push(item);
-      pickedKeys.add(k);
-      if (picked.length >= wantN) break;
-    }
-
-    if (picked.length === 0){
-      setMsg(`Все выученные уже находятся в изучаемых (${modeLabel()}).`, 'bad');
+    const take = shuffled.slice(0, BATCH_SIZE);
+    if (take.length < 4){
+      setMsg(`Недостаточно выученного для повтора (${modeLabel()}).`, 'bad');
       syncTextareas();
       return;
     }
 
-    const n = picked.length;
+    // коммит: active = take, learned = learned - take
+    const takeSet = new Set(take.map(x => pairKey(x)));
+    const rest = st.learned.filter(x => !takeSet.has(pairKey(x)));
 
-    // 1) удалить picked из learned
-    st.learned = st.learned.filter(x => !pickedKeys.has(pairKey(x)));
-
-    // 2) выместить n из active в vault (с конца)
-    let kicked = [];
-    if (Array.isArray(st.active) && st.active.length > 0){
-      if (st.active.length >= n) kicked = st.active.splice(st.active.length - n, n);
-      else kicked = st.active.splice(0, st.active.length);
-    } else {
-      st.active = [];
-    }
-
-    if (kicked.length){
-      st.vault = Array.isArray(st.vault) ? st.vault : [];
-      st.vault.push(...kicked);
-      st.vault = dedupePairs(st.vault).out;
-    }
-
-    // 3) добавить picked в active
-    st.active.push(...picked);
-    st.active = dedupePairs(st.active).out;
+    st.active = take;
+    st.learned = rest;
 
     saveModeData(appMode);
 
-    // поправить текущую позицию
-    if (!st.active || st.active.length === 0){
-      pos = 0;
-      current = null;
-      setMsg(`Повтор: добавлено ${n}. Но активных нет — нажми ＋ или добавь слова.`, 'bad');
-      renderTraining(false);
-      return;
-    }
-
-    if (pos >= st.active.length) pos = 0;
+    pos = 0;
     current = st.active[pos];
-
-    setMsg(`⟳ Повтор: +${n} / в резерв: ${kicked.length}`, 'ok');
+    setMsg(`Повтор: загружено ${st.active.length} ✅`,'ok');
     renderTraining(false);
   }
 
@@ -690,10 +739,12 @@
   }
 
   // ✓ Знаю: перенос текущего в выучено + замена из резерва (если есть)
+  // Снапшот в стек — можно откатывать сколько угодно раз
   function knowAndReplace(){
     const st = S[appMode];
     if (!current || !st.active || st.active.length < 4) return;
 
+    // push snapshot
     undoStacks[appMode].push({
       state: deepClone({ active: st.active, vault: st.vault, learned: st.learned }),
       pos,
@@ -703,12 +754,15 @@
 
     const curKey = pairKey(current);
 
+    // 1) current -> learned
     st.learned.push({ a: current.a, b: current.b });
     st.learned = dedupePairs(st.learned).out;
 
+    // 2) найти индекс текущего в active (на всякий случай)
     const idx = st.active.findIndex(x => pairKey(x) === curKey);
     const useIdx = idx >= 0 ? idx : pos;
 
+    // 3) заменить элемент на новый из резерва (или удалить, если резерва нет)
     if (st.vault && st.vault.length > 0) {
       const pick = Math.floor(Math.random() * st.vault.length);
       const replacement = st.vault.splice(pick, 1)[0];
